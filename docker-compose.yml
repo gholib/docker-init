@@ -1,0 +1,78 @@
+version: '3.9'
+
+services: 
+  frontend:
+    build: ./frontend
+    container_name: test-frontend
+    command: serve -s build -l 3000
+    networks: 
+      - test-network
+
+  api:
+    build: ./api
+    container_name: test-api
+    command: npm run start
+    restart: unless-stopped 
+    ports: 
+      - 3001:3001
+    environment: 
+      - PORT=3001
+      - MONGO_URL=mongodb://api_db:27017/api
+      - AUTH_API_URL=http://auth:3002/api
+    depends_on: 
+      - api_db
+    networks: 
+      - test-network
+  api_db: 
+    container_name: test-api-db
+    image: mongo:latest
+    volumes: 
+      - mongodb_api:/data/db
+    networks: 
+      - test-network
+
+  auth:
+    build: ./auth
+    container_name: test-auth
+    command: npm run start
+    restart: unless-stopped 
+    ports: 
+      - 3002:3002
+    environment: 
+      - PORT=3002
+      - MONGO_URL=mongodb://auth_db:27017/auth
+      - API_URL=http://api:3001/api
+    depends_on: 
+      - auth_db
+    networks: 
+      - test-network
+  auth_db: 
+    container_name: test-auth-db
+    image: mongo:latest
+    volumes: 
+      - mongodb_auth:/data/db
+    networks: 
+      - test-network
+
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: test-nginx
+    ports: 
+      - "80:80"
+    volumes: 
+      - ./nginx/nginx.conf.prod:/etc/nginx/conf.d/nginx.conf
+    depends_on: 
+      - frontend
+      - api
+      - auth
+    networks: 
+      - test-network
+
+volumes: 
+  mongodb_api:
+  mongodb_auth:
+
+networks: 
+  test-network: 
+    driver: bridge
